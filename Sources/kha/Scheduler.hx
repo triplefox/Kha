@@ -11,6 +11,7 @@ class TimeTask {
 	public var id: Int;
 	public var groupId: Int;
 	public var active: Bool;
+	public var paused: Bool;
 	
 	public function new() {
 		
@@ -22,18 +23,23 @@ class FrameTask {
 	public var priority: Int;
 	public var id: Int;
 	public var active: Bool;
+	public var paused: Bool;
 	
 	public function new(task: Void -> Bool, priority: Int, id: Int) {
 		this.task = task;
 		this.priority = priority;
 		this.id = id;
 		active = true;
+		paused = false;
 	}
 }
 
 class Scheduler {
 	private static var timeTasks: Array<TimeTask>;
 	private static var frameTasks: Array<FrameTask>;
+	
+	private static var toDeleteTime : Array<TimeTask>;
+	private static var toDeleteFrame : Array<FrameTask>;
 	
 	private static var current: Float;
 	private static var lastTime: Float;
@@ -48,26 +54,22 @@ class Scheduler {
 	private static var currentTimeTaskId: Int;
 	private static var currentGroupId: Int;
 
-	private static var halted_count: Int;
-
 	private static var DIF_COUNT = 3;
 	private static var maxframetime = 0.5;
 	
 	private static var deltas: Array<Float>;
 	
-	//private static var delta:Float = 0;
-	private static var dScale:Float = 1;
-	
 	private static var startTime: Float = 0;
 	
 	private static var lastNow: Float = 0;
+	
+	private static var activeTimeTask: TimeTask = null;
 	
 	public static function init(): Void {
 		deltas = new Array<Float>();
 		for (i in 0...DIF_COUNT) deltas[i] = 0;
 		
 		stopped = true;
-		halted_count = 0;
 		frame_tasks_sorted = true;
 		current = realTime();
 		lastTime = realTime();
@@ -78,12 +80,13 @@ class Scheduler {
 		
 		timeTasks = new Array<TimeTask>();
 		frameTasks = new Array<FrameTask>();
-		Configuration.schedulerInitialized();
+		toDeleteTime = new Array<TimeTask>();
+		toDeleteFrame = new Array<FrameTask>();
 	}
 	
-	public static function start(): Void {
-		vsync = Sys.vsynced();
-		var hz = Sys.refreshRate();
+	public static function start(restartTimers : Bool = false): Void {
+		vsync = System.vsync;
+		var hz = System.refreshRate;
 		if (hz >= 57 && hz <= 63) hz = 60;
 		onedifhz = 1.0 / hz;
 
@@ -91,6 +94,16 @@ class Scheduler {
 		resetTime();
 		lastTime = realTime();
 		for (i in 0...DIF_COUNT) deltas[i] = 0;
+		
+		if (restartTimers) {
+			for (timeTask in timeTasks) {
+				timeTask.paused = false;
+			}
+			
+			for (frameTask in frameTasks) {
+				frameTask.paused = false;
+			}
+		}
 	}
 	
 	public static function stop(): Void {
@@ -117,33 +130,26 @@ class Scheduler {
 	}
 	
 	public static function executeFrame(): Void {
-		Sys.mouse.update();
-		
 		var now: Float = realTime();
 		var delta = now - lastNow;
 		lastNow = now;
 		
-		/*delta = now - lastTime;
-		lastTime = now;
 		var frameEnd: Float = current;
 		 
-		if (delta < 0 || stopped) {
+		if (delta < 0) {
 			return;
 		}
 		
 		//tdif = 1.0 / 60.0; //force fixed frame rate
 		
-		if (halted_count > 0) {
-			delta = 0;
-		}
-		else if (delta > maxframetime) {
+		if (delta > maxframetime) {
 			delta = maxframetime;
+			frameEnd += delta;
 		}
 		else {
 			if (vsync) {
-				// TODO: fix it!
-				// this commulates delta errors with Scheduler.time()
-				// running quite different (faster) than Sys.time()
+				// this is optimized not to run at exact speed
+				// but to run as fluid as possible
 				var realdif = onedifhz;
 				while (realdif < delta - onedifhz) {
 					realdif += onedifhz;
@@ -151,92 +157,85 @@ class Scheduler {
 				
 				delta = realdif;
 				for (i in 0...DIF_COUNT - 2) {
-					delta += difs[i];
-					difs[i] = difs[i + 1];
+					delta += deltas[i];
+					deltas[i] = deltas[i + 1];
 				}
-				delta += difs[DIF_COUNT - 2];
+				delta += deltas[DIF_COUNT - 2];
 				delta /= DIF_COUNT;
-				difs[DIF_COUNT - 2] = realdif;
+				deltas[DIF_COUNT - 2] = realdif;
+				
+				frameEnd += delta;
 			}
 			else {
-				#if true
-					var interpolated_delta = delta;
-					for (i in 0...DIF_COUNT-2) {
-						interpolated_delta += difs[i];
-						difs[i] = difs[i+1];
-					}
-					interpolated_delta += difs[DIF_COUNT-2];
-					interpolated_delta /= DIF_COUNT;
-					difs[DIF_COUNT-2] = delta;
-					
-					delta =interpolated_delta; // average the frame end estimation
-				#end
+				for (i in 0...DIF_COUNT - 1) {
+					deltas[i] = deltas[i + 1];
+				}
+				deltas[DIF_COUNT - 1] = delta;
+				
+				var next: Float = 0;
+				for (i in 0...DIF_COUNT) {
+					next += deltas[i];
+				}
+				next /= DIF_COUNT;
+				
+				//delta = interpolated_delta; // average the frame end estimation
+				
+				//lastTime = now;
+				frameEnd += next;
 			}
 		}
 		
-		delta = dScale * delta;
-		frameEnd += delta;*/
-		
-		//var delta = now - lastTime;
-		
-		for (i in 0...DIF_COUNT - 1) {
-			deltas[i] = deltas[i + 1];
-		}
-		deltas[DIF_COUNT - 1] = delta;
-		
-		var next: Float = 0;
-		for (i in 0...DIF_COUNT) {
-			next += deltas[i];
-		}
-		next /= DIF_COUNT;
-		
-		//delta = interpolated_delta; // average the frame end estimation
-		
-		//lastTime = now;
-		var frameEnd = current + next;
 		lastTime = frameEnd;
+		if (!stopped) { // Stop simulation time
+			current = frameEnd;
+		}
 		
-		while (timeTasks.length > 0 && timeTasks[0].next <= frameEnd) {
-			var t = timeTasks[0];
-			current = t.next;
-			t.next += t.period;
-			timeTasks.remove(t);
-			
-			if (t.active && t.task()) {
-				if (t.period > 0 && (t.duration == 0 || t.duration >= t.start + t.next)) {
-					insertSorted(timeTasks, t);
+		for (t in timeTasks) {
+			activeTimeTask = t;
+			if (stopped || activeTimeTask.paused) { // Extend endpoint by paused time
+				activeTimeTask.next += delta;
+			}
+			else if (activeTimeTask.next <= frameEnd) {
+				activeTimeTask.next += t.period;
+				timeTasks.remove(activeTimeTask);
+				
+				if (activeTimeTask.active && activeTimeTask.task()) {
+					if (activeTimeTask.period > 0 && (activeTimeTask.duration == 0 || activeTimeTask.duration >= activeTimeTask.start + activeTimeTask.next)) {
+						insertSorted(timeTasks, activeTimeTask);
+					}
+				}
+				else {
+					activeTimeTask.active = false;
 				}
 			}
-			else {
-				t.active = false;
+		}
+		activeTimeTask = null;
+		
+		for (timeTask in timeTasks) {
+			if (!timeTask.active) {
+				toDeleteTime.push(timeTask);
 			}
 		}
 		
-		current = frameEnd;
-		
-		while (true) {
-			for (timeTask in timeTasks) {
-				if (!timeTask.active) {
-					timeTasks.remove(timeTask);
-					break;
-				}
-			}
-			break;
+		while (toDeleteTime.length > 0) {
+			timeTasks.remove(toDeleteTime.pop());
 		}
 
 		sortFrameTasks();
 		for (frameTask in frameTasks) {
-			if (!frameTask.task()) frameTask.active = false;
-		}
-
-		while (true) {
-			for (frameTask in frameTasks) {
-				if (!frameTask.active) {
-					frameTasks.remove(frameTask);
-					break;
-				}
+			if (!stopped && !frameTask.paused) {
+				if (!frameTask.task()) frameTask.active = false;
 			}
-			break;
+		}
+		
+		for (frameTask in frameTasks) {
+			if (!frameTask.active) {
+				toDeleteFrame.push(frameTask);
+			}
+		}
+		
+		while (toDeleteFrame.length > 0) {
+			frameTasks.remove(toDeleteFrame.pop());
 		}
 	}
 
@@ -245,11 +244,11 @@ class Scheduler {
 	}
 	
 	public static function realTime(): Float {
-		return Sys.getTime() - startTime;
+		return System.time - startTime;
 	}
 	
 	public static function resetTime(): Void {
-		var now = Sys.getTime();
+		var now = System.time;
 		lastNow = 0;
 		var dif = now - startTime;
 		startTime = now;
@@ -270,6 +269,15 @@ class Scheduler {
 	
 	public static function addFrameTask(task: Void -> Void, priority: Int): Int {
 		return addBreakableFrameTask(function() { task(); return true; }, priority);
+	}
+	
+	public static function pauseFrameTask(id: Int, paused: Bool): Void {
+		for (frameTask in frameTasks) {
+			if (frameTask.id == id) {
+				frameTask.paused = paused;
+				break;
+			}
+		}
 	}
 	
 	public static function removeFrameTask(id: Int): Void {
@@ -318,6 +326,7 @@ class Scheduler {
 	}
 
 	private static function getTimeTask(id: Int): TimeTask {
+		if (activeTimeTask != null && activeTimeTask.id == id) return activeTimeTask;
 		for (timeTask in timeTasks) {
 			if (timeTask.id == id) {
 				return timeTask;
@@ -326,8 +335,26 @@ class Scheduler {
 		return null;
 	}
 
+	public static function pauseTimeTask(id: Int, paused: Bool): Void {
+		var timeTask = getTimeTask(id);
+		if (timeTask != null) {
+			timeTask.paused = paused;
+		}
+	}
+	
+	public static function pauseTimeTasks(groupId: Int, paused: Bool): Void {
+		for (timeTask in timeTasks) {
+			if (timeTask.groupId == groupId) {
+				timeTask.paused = paused;
+			}
+		}
+		if (activeTimeTask != null && activeTimeTask.groupId == groupId) {
+			activeTimeTask.paused = true;
+		}
+	}
+
 	public static function removeTimeTask(id: Int): Void {
-		var timeTask : TimeTask = getTimeTask(id);
+		var timeTask = getTimeTask(id);
 		if (timeTask != null) {
 			timeTask.active = false;
 			timeTasks.remove(timeTask);
@@ -335,15 +362,18 @@ class Scheduler {
 	}
 	
 	public static function removeTimeTasks(groupId: Int): Void {
-		while (true) {
-			for (timeTask in timeTasks) {
-				if (timeTask.groupId == groupId) {
-					timeTask.active = false;
-					timeTasks.remove(timeTask);
-					break;
-				}
+		for (timeTask in timeTasks) {
+			if (timeTask.groupId == groupId) {
+				timeTask.active = false;
+				toDeleteTime.push(timeTask);
 			}
-			break;
+		}
+		if (activeTimeTask != null && activeTimeTask.groupId == groupId) {
+			activeTimeTask.paused = false;
+		} 
+		
+		while (toDeleteTime.length > 0) {
+			timeTasks.remove(toDeleteTime.pop());
 		}
 	}
 
@@ -374,17 +404,4 @@ class Scheduler {
 	
 	/** Delta time between frames*/
 	//static public var deltaTime(get_deltaTime, null):Float;
-	
-	private static function get_deltaScale():Float 
-	{
-		return dScale;
-	}
-	
-	private static function set_deltaScale(value:Float):Float 
-	{
-		return dScale = value;
-	}
-	
-	/** Multiplier for delta time*/
-	static public var deltaScale(get_deltaScale, set_deltaScale):Float;
 }

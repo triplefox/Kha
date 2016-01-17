@@ -1,18 +1,13 @@
 package kha.input;
 
 import kha.Key;
-import kha.networking.Controller;
+import kha.network.Controller;
 
-@:allow(kha.Starter)
+@:allow(kha.SystemImpl)
 @:expose
-class Keyboard 
-#if js
-//implements Controller
-#end
-{
+class Keyboard extends Controller {
 	public static function get(num: Int = 0): Keyboard {
-		if (num != 0) return null;
-		return instance;
+		return SystemImpl.getKeyboard(num);
 	}
 	
 	public function notify(downListener: Key->String->Void, upListener: Key->String->Void): Void {
@@ -25,11 +20,20 @@ class Keyboard
 		if (upListener != null) upListeners.remove(upListener);
 	}
 	
+	public function show(): Void {
+
+	}
+
+	public function hide(): Void {
+
+	}
+
 	private static var instance: Keyboard;
 	private var downListeners: Array<Key->String->Void>;
 	private var upListeners: Array<Key->String->Void>;
 	
 	private function new() {
+		super();
 		downListeners = new Array<Key->String->Void>();
 		upListeners = new Array<Key->String->Void>();
 		instance = this;
@@ -37,8 +41,8 @@ class Keyboard
 	
 	@input
 	private function sendDownEvent(key: Key, char: String): Void {
-		#if node
-		js.Node.console.log("Down: " + key + " from " + kha.networking.Session.the().me.id);
+		#if sys_server
+		js.Node.console.log("Down: " + key + " from " + kha.network.Session.the().me.id);
 		#end
 		for (listener in downListeners) {
 			listener(key, char);
@@ -47,8 +51,8 @@ class Keyboard
 	
 	@input
 	private function sendUpEvent(key: Key, char: String): Void {
-		#if node
-		js.Node.console.log("Up: " + key + " from " + kha.networking.Session.the().me.id);
+		#if sys_server
+		js.Node.console.log("Up: " + key + " from " + kha.network.Session.the().me.id);
 		#end
 		for (listener in upListeners) {
 			listener(key, char);

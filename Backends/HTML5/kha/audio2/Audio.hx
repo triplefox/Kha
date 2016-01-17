@@ -4,6 +4,9 @@ import js.Browser;
 import js.html.audio.AudioContext;
 import js.html.audio.AudioProcessingEvent;
 import js.html.audio.ScriptProcessorNode;
+import kha.js.AEAudioChannel;
+import kha.js.WebAudioSound;
+import kha.Sound;
 
 class Audio {
 	private static var buffer: Buffer;
@@ -29,12 +32,15 @@ class Audio {
 	
 	@:noCompletion
 	public static function _init(): Bool {
-		var bufferSize = 1024 * 2;
-		
-		buffer = new Buffer(bufferSize * 4, 2, 44100);
+		#if sys_debug_html5
+		return false;
+		#end
 		
 		initContext();
 		if (_context == null) return false;
+		
+		var bufferSize = 1024 * 2;
+		buffer = new Buffer(bufferSize * 4, 2, Std.int(_context.sampleRate));
 		
 		processingNode = _context.createScriptProcessor(bufferSize, 0, 2);
 		processingNode.onaudioprocess = function (e: AudioProcessingEvent) {
@@ -64,4 +70,11 @@ class Audio {
 	}
 
 	public static var audioCallback: Int->Buffer->Void;
+	
+	public static function play(sound: Sound, loop: Bool = false): kha.audio1.AudioChannel {
+		//var channel = new AEAudioChannel(cast(sound, WebAudioSound).aemusic, loop);
+		//channel.play();
+		//return channel;
+		return null;
+	}
 }

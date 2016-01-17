@@ -1,12 +1,23 @@
 package kha;
 
-interface Font {
-	var name(get, null): String;
-	var style(get, null): FontStyle;
-	var size(get, null): Float;
-	function getHeight(): Float;
-	function charWidth(ch: String): Float;
-	function charsWidth(ch: String, offset: Int, length: Int): Float;
-	function stringWidth(str: String): Float;
-	function getBaselinePosition(): Float;
+/**
+ * This represents a text font.
+ */
+interface Font extends Resource {
+	/**
+	 * Font height
+	 */
+	function height(fontSize: Int): Float;
+	
+	/**
+	 * Width of a string with this font.
+	 *
+	 * @param str		The string to measure.
+	 */
+	function width(fontSize: Int, str: String): Float;
+	
+	/**
+	 * The base line position.
+	 */
+	function baseline(fontSize: Int): Float;
 }

@@ -5,6 +5,7 @@ import js.Browser;
 import js.html.ImageElement;
 import js.html.Uint8Array;
 import js.html.VideoElement;
+import js.html.webgl.GL;
 import kha.graphics4.TextureFormat;
 import kha.js.CanvasGraphics;
 import kha.js.graphics4.Graphics;
@@ -21,6 +22,8 @@ class WebGLImage extends Image {
 	private var format: TextureFormat;
 	private var renderTarget: Bool;
 	public var frameBuffer: Dynamic;
+	public var renderBuffer: Dynamic;
+	public var texture: Dynamic;
 	
 	private var graphics1: kha.graphics1.Graphics;
 	private var graphics2: kha.graphics2.Graphics;
@@ -62,7 +65,7 @@ class WebGLImage extends Image {
 		
 	override private function get_g4(): kha.graphics4.Graphics {
 		if (graphics4 == null) {
-			graphics4 = new Graphics(true, this);
+			graphics4 = new Graphics(this);
 		}
 		return graphics4;
 	}
@@ -88,7 +91,15 @@ class WebGLImage extends Image {
 			if (context == null) return true;
 			else createImageData();
 		}
-		return (data.data[y * Std.int(image.width) * 4 + x * 4 + 3] != 0);
+		return (data.data[y * Std.int(image.width) * 4 + x * 4 + 3] != 0);		
+	}
+	
+	override public function at(x: Int, y: Int): Color {
+		if (data == null) {
+			if (context == null) return Color.Black;
+			else createImageData();
+		}
+		return Color.fromValue(data.data[y * Std.int(image.width) * 4 + x * 4 + 0]);
 	}
 	
 	function createImageData() {
@@ -98,8 +109,6 @@ class WebGLImage extends Image {
 		context.drawImage(image, 0, 0, image.width, image.height, 0, 0, image.width, image.height);
 		data = context.getImageData(0, 0, image.width, image.height);
 	}
-		
-	private var texture: Dynamic;
 	
 	private static function upperPowerOfTwo(v: Int): Int {
 		v--;
@@ -113,33 +122,41 @@ class WebGLImage extends Image {
 	}
 	
 	public function createTexture(): Void {
-		if (Sys.gl == null) return;
-		texture = Sys.gl.createTexture();
+		if (SystemImpl.gl == null) return;
+		texture = SystemImpl.gl.createTexture();
 		//texture.image = image;
-		Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, texture);
+		SystemImpl.gl.bindTexture(GL.TEXTURE_2D, texture);
 		//Sys.gl.pixelStorei(Sys.gl.UNPACK_FLIP_Y_WEBGL, true);
 		
-		Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_MAG_FILTER, Sys.gl.LINEAR);
-		Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_MIN_FILTER, Sys.gl.LINEAR);
-		Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_WRAP_S, Sys.gl.CLAMP_TO_EDGE);
-		Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_WRAP_T, Sys.gl.CLAMP_TO_EDGE);
+		SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+		SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+		SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+		SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
 		if (renderTarget) {
-			frameBuffer = Sys.gl.createFramebuffer();
-			Sys.gl.bindFramebuffer(Sys.gl.FRAMEBUFFER, frameBuffer);
-			Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, realWidth, realHeight, 0, Sys.gl.RGBA, format == TextureFormat.RGBA128 ? Sys.gl.FLOAT : Sys.gl.UNSIGNED_BYTE, null);
-			Sys.gl.framebufferTexture2D(Sys.gl.FRAMEBUFFER, Sys.gl.COLOR_ATTACHMENT0, Sys.gl.TEXTURE_2D, texture, 0);
-			Sys.gl.bindFramebuffer(Sys.gl.FRAMEBUFFER, null);
+			frameBuffer = SystemImpl.gl.createFramebuffer();
+			SystemImpl.gl.bindFramebuffer(GL.FRAMEBUFFER, frameBuffer);
+			SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, realWidth, realHeight, 0, GL.RGBA, format == TextureFormat.RGBA128 ? GL.FLOAT : GL.UNSIGNED_BYTE, null);
+			SystemImpl.gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, texture, 0);
+			
+			// For depth tests
+			renderBuffer = SystemImpl.gl.createRenderbuffer();
+			SystemImpl.gl.bindRenderbuffer(GL.RENDERBUFFER, renderBuffer);
+			SystemImpl.gl.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, realWidth, realHeight);
+			SystemImpl.gl.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, renderBuffer);
+			
+			SystemImpl.gl.bindRenderbuffer(GL.RENDERBUFFER, null);
+			SystemImpl.gl.bindFramebuffer(GL.FRAMEBUFFER, null);
 		}
-		else if (video != null) Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, Sys.gl.RGBA, Sys.gl.UNSIGNED_BYTE, video);
-		else Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, Sys.gl.RGBA, format == TextureFormat.RGBA128 ? Sys.gl.FLOAT : Sys.gl.UNSIGNED_BYTE, image);
+		else if (video != null) SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, video);
+		else SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, format == TextureFormat.RGBA128 ? GL.FLOAT : GL.UNSIGNED_BYTE, image);
 		//Sys.gl.generateMipmap(Sys.gl.TEXTURE_2D);
-		Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, null);
+		SystemImpl.gl.bindTexture(GL.TEXTURE_2D, null);
 	}
 	
 	public function set(stage: Int): Void {
-		Sys.gl.activeTexture(Sys.gl.TEXTURE0 + stage);
-		Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, texture);
-		if (video != null) Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, Sys.gl.RGBA, Sys.gl.UNSIGNED_BYTE, video);
+		SystemImpl.gl.activeTexture(GL.TEXTURE0 + stage);
+		SystemImpl.gl.bindTexture(GL.TEXTURE_2D, texture);
+		if (video != null) SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, video);
 	}
 	
 	public var bytes: Bytes;
@@ -150,22 +167,22 @@ class WebGLImage extends Image {
 	}
 	
 	override public function unlock(): Void {
-		if (Sys.gl != null) {
-			texture = Sys.gl.createTexture();
+		if (SystemImpl.gl != null) {
+			texture = SystemImpl.gl.createTexture();
 			//texture.image = image;
-			Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, texture);
+			SystemImpl.gl.bindTexture(GL.TEXTURE_2D, texture);
 			//Sys.gl.pixelStorei(Sys.gl.UNPACK_FLIP_Y_WEBGL, true);
 			
-			Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_MAG_FILTER, Sys.gl.LINEAR);
-			Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_MIN_FILTER, Sys.gl.LINEAR);
-			Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_WRAP_S, Sys.gl.CLAMP_TO_EDGE);
-			Sys.gl.texParameteri(Sys.gl.TEXTURE_2D, Sys.gl.TEXTURE_WRAP_T, Sys.gl.CLAMP_TO_EDGE);
+			SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+			SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+			SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+			SystemImpl.gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
 			
 			switch (format) {
 			case L8:
-				Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.LUMINANCE, width, height, 0, Sys.gl.LUMINANCE, Sys.gl.UNSIGNED_BYTE, new Uint8Array(bytes.getData()));
+				SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.LUMINANCE, width, height, 0, GL.LUMINANCE, GL.UNSIGNED_BYTE, new Uint8Array(bytes.getData()));
 				
-				if (Sys.gl.getError() == 1282) { // no LUMINANCE support in IE11
+				if (SystemImpl.gl.getError() == 1282) { // no LUMINANCE support in IE11
 					var rgbaBytes = Bytes.alloc(width * height * 4);
 					for (y in 0...height) for (x in 0...width) {
 						var value = bytes.get(y * width + x);
@@ -174,16 +191,16 @@ class WebGLImage extends Image {
 						rgbaBytes.set(y * width * 4 + x * 4 + 2, value);
 						rgbaBytes.set(y * width * 4 + x * 4 + 3, 255);
 					}
-					Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, width, height, 0, Sys.gl.RGBA, Sys.gl.UNSIGNED_BYTE, new Uint8Array(rgbaBytes.getData()));
+					SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, width, height, 0, GL.RGBA, GL.UNSIGNED_BYTE, new Uint8Array(rgbaBytes.getData()));
 				}
 			case RGBA32:
-				Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, width, height, 0, Sys.gl.RGBA, Sys.gl.UNSIGNED_BYTE, new Uint8Array(bytes.getData()));
+				SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, width, height, 0, GL.RGBA, GL.UNSIGNED_BYTE, new Uint8Array(bytes.getData()));
 			case RGBA128:
-				Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, width, height, 0, Sys.gl.RGBA, Sys.gl.FLOAT, new Uint8Array(bytes.getData()));
+				SystemImpl.gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, width, height, 0, GL.RGBA, GL.FLOAT, new Uint8Array(bytes.getData()));
 			}
 			
 			//Sys.gl.generateMipmap(Sys.gl.TEXTURE_2D);
-			Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, null);
+			SystemImpl.gl.bindTexture(GL.TEXTURE_2D, null);
 			bytes = null;
 		}
 	}

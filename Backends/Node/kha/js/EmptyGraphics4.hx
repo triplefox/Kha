@@ -38,6 +38,10 @@ class EmptyGraphics4 implements Graphics {
 		
 	}
 	
+	public function flush(): Void {
+		
+	}
+	
 	public function vsynced(): Bool {
 		return true;
 	}
@@ -47,6 +51,10 @@ class EmptyGraphics4 implements Graphics {
 	}
 	
 	public function clear(?color: Color, ?depth: Float, ?stencil: Int): Void {
+		
+	}
+
+	public function viewport(x : Int, y : Int, width : Int, height : Int): Void{
 		
 	}
 	
@@ -69,8 +77,16 @@ class EmptyGraphics4 implements Graphics {
 	public function setScissor(rect: Rectangle): Void {
 		
 	}
+
+	public function disableScissor(): Void {
+		
+	}
 	
 	public function setVertexBuffer(vertexBuffer: VertexBuffer): Void {
+		
+	}
+	
+	public function setVertexBuffers(vertexBuffers: Array<kha.graphics4.VertexBuffer>): Void {
 		
 	}
 
@@ -80,6 +96,10 @@ class EmptyGraphics4 implements Graphics {
 	
 	public function setTexture(unit: TextureUnit, texture: Image): Void {
 		
+	}
+
+	public function setVideoTexture(unit: kha.graphics4.TextureUnit, texture: kha.Video): Void {
+
 	}
 
 	public function setTextureParameters(texunit: TextureUnit, uAddressing: TextureAddressing, vAddressing: TextureAddressing, minificationFilter: TextureFilter, magnificationFilter: TextureFilter, mipmapFilter: MipMapFilter): Void {
@@ -143,6 +163,14 @@ class EmptyGraphics4 implements Graphics {
 	}
 	
 	public function drawIndexedVertices(start: Int = 0, count: Int = -1): Void {
+		
+	}
+	
+	public function instancedRenderingAvailable(): Bool {
+		return true;
+	}
+	
+	public function drawIndexedVerticesInstanced(instanceCount: Int, start: Int = 0, count: Int = -1): Void {
 		
 	}
 }

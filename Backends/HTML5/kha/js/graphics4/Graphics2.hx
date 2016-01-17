@@ -1,5 +1,6 @@
 package kha.js.graphics4;
 
+import js.html.webgl.GL;
 import kha.Color;
 
 class Graphics2 extends kha.graphics4.Graphics2 {
@@ -13,7 +14,12 @@ class Graphics2 extends kha.graphics4.Graphics2 {
 	}
 	
 	override public function begin(clear: Bool = true, clearColor: Color = null): Void {
-		Sys.gl.colorMask(true, true, true, true);
+		SystemImpl.gl.colorMask(true, true, true, true);
+		
+		// Disable depth test so that everything is just overpainted as determined by the order of function calls2
+		SystemImpl.gl.disable(GL.DEPTH_TEST);
+		SystemImpl.gl.depthFunc(GL.ALWAYS);
+		
 		super.begin(clear, clearColor);
 	}
 }

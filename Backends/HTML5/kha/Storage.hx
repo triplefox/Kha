@@ -28,7 +28,7 @@ class LocalStorageFile extends StorageFile {
 		var storage: WebStorage = untyped __js__("window.localStorage");
 		var value: String = storage.getItem(name);
 		if (value == null) return null;
-		else return new Blob(decode(value));
+		else return Blob.fromBytes(decode(value));
 	}
 	
 	override public function write(data: Blob): Void {
@@ -45,8 +45,9 @@ class LocalStorageFile extends StorageFile {
 		var reserved = [0, 10, 13, 61];
 		var output = '';
 		var converted, ele;
-		for (i in 0...source.byteLength) {
-			ele = untyped __js__("source[i]");
+		var bytes = new js.html.Uint8Array(source);
+		for (i in 0...bytes.length) {
+			ele = bytes[i];
 			converted = (ele + 42) % 256;
 			if (!Lambda.has(reserved, converted)) {
 				output += String.fromCharCode(converted);

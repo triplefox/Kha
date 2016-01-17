@@ -4,11 +4,9 @@ class AudioElementAudio {
 	@:noCompletion
 	public static function _compile(): Void { }
 	
-	public static function playSound(sound: Sound): kha.audio1.SoundChannel {
-		return null;
-	}
-
-	public static function playMusic(music: Music, loop: Bool = false): kha.audio1.MusicChannel {
-		return null;
+	public static function play(sound: Sound, loop: Bool = false, stream: Bool = false): kha.audio1.AudioChannel {
+		sound.element.loop = loop;
+		sound.element.play();
+		return cast new AEAudioChannel(sound);
 	}
 }

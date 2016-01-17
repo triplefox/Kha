@@ -2,6 +2,7 @@ package kha;
 
 import haxe.io.Bytes;
 import js.html.ImageElement;
+import js.html.webgl.GL;
 import kha.graphics4.TextureFormat;
 import kha.graphics4.Usage;
 
@@ -9,18 +10,18 @@ class Image implements Canvas implements Resource {
 	public static function create(width: Int, height: Int, format: TextureFormat = null, usage: Usage = null, levels: Int = 1): Image {
 		if (format == null) format = TextureFormat.RGBA32;
 		if (usage == null) usage = Usage.StaticUsage;
-		if (Sys.gl == null) return new CanvasImage(width, height, format, false);
+		if (SystemImpl.gl == null) return new CanvasImage(width, height, format, false);
 		else return new WebGLImage(width, height, format, false);
 	}
 	
 	public static function createRenderTarget(width: Int, height: Int, format: TextureFormat = null, depthStencil: Bool = false, antiAliasingSamples: Int = 1): Image {
 		if (format == null) format = TextureFormat.RGBA32;
-		if (Sys.gl == null) return new CanvasImage(width, height, format, true);
+		if (SystemImpl.gl == null) return new CanvasImage(width, height, format, true);
 		else return new WebGLImage(width, height, format, true);
 	}
 	
 	public static function fromImage(image: ImageElement, readable: Bool): Image {
-		if (Sys.gl == null) {
+		if (SystemImpl.gl == null) {
 			var img = new CanvasImage(image.width, image.height, TextureFormat.RGBA32, false);
 			img.image = image;
 			img.createTexture();
@@ -35,7 +36,7 @@ class Image implements Canvas implements Resource {
 	}
 	
 	public static function fromVideo(video: kha.js.Video): Image {
-		if (Sys.gl == null) {
+		if (SystemImpl.gl == null) {
 			var img = new CanvasImage(video.element.videoWidth, video.element.videoHeight, TextureFormat.RGBA32, false);
 			img.video = video.element;
 			img.createTexture();
@@ -52,16 +53,17 @@ class Image implements Canvas implements Resource {
 	public static var maxSize(get, null): Int;
 	
 	public static function get_maxSize(): Int {
-		return Sys.gl == null ? 1024 * 8 : Sys.gl.getParameter(Sys.gl.MAX_TEXTURE_SIZE);
+		return SystemImpl.gl == null ? 1024 * 8 : SystemImpl.gl.getParameter(GL.MAX_TEXTURE_SIZE);
 	}
 	
 	public static var nonPow2Supported(get, null): Bool;
 	
 	public static function get_nonPow2Supported(): Bool {
-		return Sys.gl != null;
+		return SystemImpl.gl != null;
 	}
 	
 	public function isOpaque(x: Int, y: Int): Bool { return false; }
+	public function at(x: Int, y: Int): Color { return Color.Black; }
 	public function unload(): Void { }
 	public function lock(level: Int = 0): Bytes { return null; }
 	public function unlock(): Void { }

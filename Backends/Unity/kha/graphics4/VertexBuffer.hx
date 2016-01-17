@@ -1,7 +1,7 @@
 package kha.graphics4;
 
 import cs.NativeArray;
-import haxe.io.Float32Array;
+import kha.arrays.Float32Array;
 import unityEngine.Mesh;
 import unityEngine.Vector2;
 import unityEngine.Vector3;
@@ -47,6 +47,8 @@ class VertexBuffer {
 				myStride += 3;
 			case VertexData.Float4:
 				myStride += 4;
+			case VertexData.Float4x4:
+				myStride += 4 * 4;
 			}
 		}
 		array = new Float32Array(vertexCount * myStride);
@@ -57,6 +59,7 @@ class VertexBuffer {
 	}
 
 	public function unlock(): Void {
+		var array = this.array.data();
 		//mesh.Clear(true);
 		var offset: Int = 0;
 		var uvindex: Int = 0;
@@ -134,6 +137,8 @@ class VertexBuffer {
 				}
 				mesh.tangents = tangents;
 				offset += 4;
+			case Float4x4:
+				offset += 4 * 4;
 			}
 		}
 		//mesh.UploadMeshData(true);
